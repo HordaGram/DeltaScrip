@@ -1,20 +1,28 @@
--- 1. Системное уведомление
+-- 1. Системное уведомление (чтобы видеть, что скрипт начал работу)
 pcall(function()
     game.StarterGui:SetCore("SendNotification", {
         Title = "Загрузка...",
-        Text = "Подключаю библиотеку Rayfield",
+        Text = "Подключаю меню...",
         Duration = 3
     })
 end)
 
--- 2. Загружаем легкую библиотеку Rayfield
+-- 2. Загружаем Rayfield по ПРЯМОЙ и рабочей ссылке
 local Rayfield
 local success, err = pcall(function()
-    Rayfield = loadstring(game:HttpGet('https://sirblood.github.io/Rayfield'))()
+    -- Используем стабильную сырую ссылку (без Cloudflare и защит)
+    Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
 end)
 
+-- ЕСЛИ ПРОИЗОШЛА ОШИБКА ЗАГРУЗКИ БИБЛИОТЕКИ - ВЫВОДИМ ЕЁ НА ЭКРАН!
 if not success or not Rayfield then
-    warn("Ошибка загрузки Rayfield: " .. tostring(err))
+    pcall(function()
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "КРИТИЧЕСКАЯ ОШИБКА",
+            Text = tostring(err), -- Покажет точную причину поломки
+            Duration = 15
+        })
+    end)
     return
 end
 
@@ -47,7 +55,7 @@ local Window = Rayfield:CreateWindow({
     LoadingTitle = "Проверка лицензии...",
     LoadingSubtitle = "by HordaGram",
     ConfigurationSaving = {Enabled = false},
-    KeySystem = false -- Выключаем встроенную, т.к. делаем свою, более надежную
+    KeySystem = false 
 })
 
 local LoginTab = Window:CreateTab("Получить ключ", 4483345998)
@@ -111,7 +119,6 @@ LoginTab:CreateButton({
             return 
         end
         
-        -- Делаем запрос к твоему Python-серверу
         local url = SERVER_IP .. "/check_key?hwid=" .. hwid .. "&key=" .. enteredKey
         local successReq, response = pcall(function()
             return game:HttpGet(url)
@@ -124,8 +131,8 @@ LoginTab:CreateButton({
 
             if successJSON and data and data.valid then
                 Rayfield:Notify({Title = "Успех!", Content = "Ключ верный. Загрузка...", Duration = 3})
-                Rayfield:Destroy() -- Закрываем окно ключа
-                LoadMainScript()   -- Открываем основной чит
+                Rayfield:Destroy() -- Закрываем окно входа
+                LoadMainScript()   -- Открываем читы
             else
                 Rayfield:Notify({Title = "Ошибка", Content = "Неверный ключ!", Duration = 3})
             end
