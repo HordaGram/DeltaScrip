@@ -1,27 +1,27 @@
--- 1. Системное уведомление для проверки запуска (стандартное от Roblox)
+-- 1. Системное уведомление
 pcall(function()
     game.StarterGui:SetCore("SendNotification", {
-        Title = "Скрипт запущен",
-        Text = "Пытаюсь загрузить меню...",
-        Duration = 5
+        Title = "Загрузка...",
+        Text = "Подключаю библиотеку Rayfield",
+        Duration = 3
     })
 end)
 
--- 2. Безопасная загрузка библиотеки Orion
-local OrionLib
+-- 2. Загружаем легкую библиотеку Rayfield
+local Rayfield
 local success, err = pcall(function()
-    OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
+    Rayfield = loadstring(game:HttpGet('https://sirblood.github.io/Rayfield'))()
 end)
 
-if not success or not OrionLib then
-    warn("Не удалось загрузить Orion Library! Ошибка: " .. tostring(err))
-    return -- Останавливаем скрипт, если библиотека заблокирована
+if not success or not Rayfield then
+    warn("Ошибка загрузки Rayfield: " .. tostring(err))
+    return
 end
 
 local HttpService = game:GetService("HttpService")
 
 -- === НАСТРОЙКИ СВЯЗИ ===
-local SERVER_IP = "http://191.44.113.226:5000" -- Твой IP сервера (используем порт 5000)
+local SERVER_IP = "http://191.44.113.226:5000" -- Твой сервер
 local BOT_USERNAME = "HordaPosterbot" -- Твой бот
 
 -- 3. БЕЗОПАСНОЕ получение HWID
@@ -39,69 +39,75 @@ if hwid == "UNKNOWN" or hwid == "" or hwid == nil then
     end
 end
 
--- Формируем ссылку на твоего бота
 local botLink = "https://t.me/" .. BOT_USERNAME .. "?start=" .. hwid
 
--- === СОЗДАНИЕ ОКНА ВХОДА ===
-local LoginWindow = OrionLib:MakeWindow({
-    Name = "Система Ключей | Delta", 
-    HidePremium = true, 
-    SaveConfig = false, 
-    IntroText = "Проверка..."
+-- === ОКНО ВХОДА ===
+local Window = Rayfield:CreateWindow({
+    Name = "Система Ключей | Delta",
+    LoadingTitle = "Проверка лицензии...",
+    LoadingSubtitle = "by HordaGram",
+    ConfigurationSaving = {Enabled = false},
+    KeySystem = false -- Выключаем встроенную, т.к. делаем свою, более надежную
 })
 
-local LoginTab = LoginWindow:MakeTab({
-    Name = "Получить ключ", 
-    Icon = "rbxassetid://4483345998", 
-    PremiumOnly = false
-})
+local LoginTab = Window:CreateTab("Получить ключ", 4483345998)
 
-LoginTab:AddParagraph("Твой HWID", hwid)
+LoginTab:CreateParagraph({Title = "Твой HWID", Content = hwid})
 
-LoginTab:AddButton({
+LoginTab:CreateButton({
     Name = "1. Копировать ссылку на бота",
     Callback = function()
         pcall(function()
             setclipboard(botLink)
         end)
-        OrionLib:MakeNotification({Name = "Успех", Content = "Ссылка скопирована! Открой браузер.", Time = 4})
-    end    
+        Rayfield:Notify({Title = "Успех!", Content = "Ссылка скопирована. Переходи в ТГ.", Duration = 4})
+    end
 })
 
 local enteredKey = ""
-LoginTab:AddTextbox({
+LoginTab:CreateInput({
     Name = "2. Вставь ключ сюда",
-    Default = "",
-    TextDisappear = false,
-    Callback = function(Value)
-        enteredKey = Value
-    end      
+    PlaceholderText = "KEY-...",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(Text)
+        enteredKey = Text
+    end
 })
 
 -- === ОСНОВНОЕ МЕНЮ (ПОСЛЕ УСПЕШНОГО ВХОДА) ===
 local function LoadMainScript()
-    local MainWindow = OrionLib:MakeWindow({Name = "Мой Супер Чит", HidePremium = false, SaveConfig = false, IntroText = "Успешный вход!"})
-    local MainTab = MainWindow:MakeTab({Name = "Главная", Icon = "rbxassetid://4483345998", PremiumOnly = false})
+    local MainWindow = Rayfield:CreateWindow({
+        Name = "Мой Супер Чит",
+        LoadingTitle = "Успешный вход!",
+        ConfigurationSaving = {Enabled = false}
+    })
     
-    MainTab:AddParagraph("Успешно!", "Ключ принят. Твой скрипт загружен.")
+    local MainTab = MainWindow:CreateTab("Главная", 4483345998)
     
-    MainTab:AddSlider({
-        Name = "Скорость бега", Min = 16, Max = 100, Default = 16, Color = Color3.fromRGB(0, 150, 255), Increment = 1, ValueName = "spd",
+    MainTab:CreateParagraph({Title = "Успешно!", Content = "Ключ принят. Твой скрипт загружен."})
+    
+    MainTab:CreateSlider({
+        Name = "Скорость бега",
+        Range = {16, 100},
+        Increment = 1,
+        Suffix = "Speed",
+        CurrentValue = 16,
+        Flag = "WalkSpeedSlider",
         Callback = function(Value)
             local char = game.Players.LocalPlayer.Character
             if char and char:FindFirstChild("Humanoid") then
                 char.Humanoid.WalkSpeed = Value
             end
-        end    
+        end
     })
 end
 
 -- Кнопка проверки ключа
-LoginTab:AddButton({
+LoginTab:CreateButton({
     Name = "3. Проверить ключ и войти",
     Callback = function()
         if enteredKey == "" then 
-            OrionLib:MakeNotification({Name = "Ошибка", Content = "Поле ключа пустое!", Time = 3})
+            Rayfield:Notify({Title = "Ошибка", Content = "Поле ключа пустое!", Duration = 3})
             return 
         end
         
@@ -117,16 +123,14 @@ LoginTab:AddButton({
             end)
 
             if successJSON and data and data.valid then
-                OrionLib:MakeNotification({Name = "Успех!", Content = "Ключ верный. Загрузка...", Time = 3})
-                OrionLib:Destroy() 
-                LoadMainScript()   
+                Rayfield:Notify({Title = "Успех!", Content = "Ключ верный. Загрузка...", Duration = 3})
+                Rayfield:Destroy() -- Закрываем окно ключа
+                LoadMainScript()   -- Открываем основной чит
             else
-                OrionLib:MakeNotification({Name = "Ошибка", Content = "Неверный ключ!", Time = 3})
+                Rayfield:Notify({Title = "Ошибка", Content = "Неверный ключ!", Duration = 3})
             end
         else
-            OrionLib:MakeNotification({Name = "Ошибка", Content = "Сервер недоступен!", Time = 3})
+            Rayfield:Notify({Title = "Ошибка", Content = "Сервер недоступен!", Duration = 3})
         end
-    end    
+    end
 })
-
-OrionLib:Init()
