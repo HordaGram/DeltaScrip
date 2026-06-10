@@ -2,19 +2,25 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
+local GuiService = game:GetService("GuiService")
 local player = Players.LocalPlayer
 
 -- === НАСТРОЙКИ СВЯЗИ ===
 local SERVER_IP = "http://191.44.113.226:5000"
 local BOT_USERNAME = "HordaPosterbot"
 
--- === ПОЛУЧЕНИЕ HWID ===
+-- === ПОЛУЧЕНИЕ HWID и ROBLOX ID ===
 local hwid = "UNKNOWN"
 pcall(function() hwid = game:GetService("RbxAnalyticsService"):GetClientId() end)
 if hwid == "UNKNOWN" or hwid == "" or hwid == nil then
     hwid = player and tostring(player.UserId) .. "_USER" or "GUEST_" .. tostring(math.random(1000, 9999))
 end
-local botLink = "https://t.me/" .. BOT_USERNAME .. "?start=" .. hwid
+
+-- Получаем ID игрока для аватарки в боте
+local robloxId = player and tostring(player.UserId) or "0"
+
+-- Ссылка теперь содержит и HWID, и Roblox ID (разделенные нижним подчеркиванием)
+local botLink = "https://t.me/" .. BOT_USERNAME .. "?start=" .. hwid .. "_" .. robloxId
 
 -- === СИСТЕМА СОХРАНЕНИЯ КЛЮЧЕЙ ===
 local keyFileName = "HordaKey_" .. hwid .. ".txt"
@@ -47,7 +53,7 @@ local function createButtonWithIcon(parent, text, yPos, color, iconId)
     local btn = Instance.new("TextButton", parent)
     btn.Size = UDim2.new(1, -40, 0, 40)
     btn.Position = UDim2.new(0, 20, 0, yPos)
-    btn.Text = "     " .. text -- Отступ для иконки
+    btn.Text = "     " .. text 
     btn.BackgroundColor3 = color or Color3.fromRGB(30, 30, 40)
     btn.BackgroundTransparency = 0.2
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -74,16 +80,25 @@ local function showExpiredMessage()
     
     local msg = Instance.new("TextLabel", expFrame)
     msg.Size = UDim2.new(1, 0, 1, 0)
-    msg.Text = "⏳ Время ключа вышло!\nСкрипт закрыт.\nПожалуйста, получи новый ключ."
+    msg.Text = "⏳ Время ключа вышло!\nСкрипт закрыт.\nПожалуйста, получи новый ключ в боте."
     msg.TextColor3 = Color3.fromRGB(255, 80, 80)
     msg.Font = Enum.Font.GothamBold
-    msg.TextSize = 16
+    msg.TextSize = 15
     msg.BackgroundTransparency = 1
+end
+
+-- === УВЕДОМЛЕНИЕ О ВХОДЕ В ТГ ===
+local function notifyLoginToTelegram()
+    pcall(function()
+        game:HttpGet(SERVER_IP .. "/notify_login?hwid=" .. hwid)
+    end)
 end
 
 -- === ОСНОВНОЕ МЕНЮ ЧИТОВ ===
 local function StartMainCheat(validKey)
-    saveKey(validKey) -- Запоминаем валидный ключ
+    saveKey(validKey) -- Сохраняем ключ в память телефона
+    notifyLoginToTelegram() -- Отправляем сигнал боту
+    
     if gui:FindFirstChild("LoginFrame") then gui.LoginFrame:Destroy() end
 
     local mainFrame = Instance.new("Frame", gui)
@@ -124,7 +139,7 @@ local function StartMainCheat(validKey)
     layout.Padding = UDim.new(0, 10)
     layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
-    -- ФИКС АНИМАЦИИ МЕНЮ
+    -- Анимация меню
     local isMinimized = false
     closeBtn.MouseButton1Click:Connect(function()
         isMinimized = not isMinimized
@@ -140,13 +155,52 @@ local function StartMainCheat(validKey)
         end
     end)
 
-    -- === НОВЫЕ ФУНКЦИИ ===
+    -- === ФУНКЦИИ ===
     local btnESP = createButtonWithIcon(contentFrame, "ESP Ролей (Взор сквозь стены)", 0, Color3.fromRGB(40, 40, 50), "3926305904")
     local espEnabled = false
     btnESP.MouseButton1Click:Connect(function()
         espEnabled = not espEnabled
         btnESP.BackgroundColor3 = espEnabled and Color3.fromRGB(40, 160, 60) or Color3.fromRGB(40, 40, 50)
-        -- Логика ESP остается той же (скрыта для краткости структуры)
+        
+        task.spawn(function()
+            while espEnabled do
+                for _, p in pairs(Players:GetPlayers()) do
+                    if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                        local role = "Невиновный"
+                        local color = Color3.fromRGB(0, 255, 0)
+                        if p.Backpack:FindFirstChild("Knife") or p.Character:FindFirstChild("Knife") then
+                            role = "МАРДЕР"
+                            color = Color3.fromRGB(255, 0, 0)
+                        elseif p.Backpack:FindFirstChild("Gun") or p.Character:FindFirstChild("Gun") then
+                            role = "ШЕРИФ"
+                            color = Color3.fromRGB(0, 100, 255)
+                        end
+                        local bgui = p.Character.HumanoidRootPart:FindFirstChild("MM2_ESP")
+                        if not bgui then
+                            bgui = Instance.new("BillboardGui", p.Character.HumanoidRootPart)
+                            bgui.Name = "MM2_ESP"
+                            bgui.Size = UDim2.new(0, 100, 0, 40)
+                            bgui.StudsOffset = Vector3.new(0, 3, 0)
+                            bgui.AlwaysOnTop = true
+                            local text = Instance.new("TextLabel", bgui)
+                            text.Size = UDim2.new(1, 0, 1, 0)
+                            text.BackgroundTransparency = 1
+                            text.TextScaled = true
+                            text.Font = Enum.Font.GothamBold
+                        end
+                        bgui.TextLabel.Text = p.Name .. "\n[" .. role .. "]"
+                        bgui.TextLabel.TextColor3 = color
+                    end
+                end
+                task.wait(1)
+            end
+            for _, p in pairs(Players:GetPlayers()) do
+                if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local bgui = p.Character.HumanoidRootPart:FindFirstChild("MM2_ESP")
+                    if bgui then bgui:Destroy() end
+                end
+            end
+        end)
     end)
 
     local btnGunTP = createButtonWithIcon(contentFrame, "Телепорт к Пистолету", 0, Color3.fromRGB(40, 40, 50), "6031094678")
@@ -186,7 +240,7 @@ local function StartMainCheat(validKey)
                 local validJSON, data = pcall(function() return HttpService:JSONDecode(response) end)
                 if validJSON and data and not data.valid then
                     showExpiredMessage()
-                    break -- Останавливаем цикл
+                    break 
                 end
             end
         end
@@ -202,7 +256,7 @@ if savedKey ~= "" then
         local validJSON, data = pcall(function() return HttpService:JSONDecode(response) end)
         if validJSON and data and data.valid then
             StartMainCheat(savedKey)
-            return -- Если ключ жив, сразу запускаем скрипт, не показывая окно
+            return -- Если ключ жив, сразу запускаем скрипт
         end
     end
 end
@@ -256,8 +310,8 @@ statusLabel.BackgroundTransparency = 1
 btnCopy.MouseButton1Click:Connect(function()
     pcall(function() setclipboard(botLink) end)
     statusLabel.Text = "Ссылка скопирована!"
-    -- Пытаемся автоматически открыть браузер (работает не во всех экзекуторах)
-    pcall(function() game:GetService("GuiService"):OpenBrowserWindow(botLink) end)
+    -- Пытаемся автоматически перебросить в Телеграм (открыть браузер)
+    pcall(function() GuiService:OpenBrowserWindow(botLink) end)
 end)
 
 btnLogin.MouseButton1Click:Connect(function()
