@@ -1,9 +1,13 @@
 local Players = game:GetService("Players")
+
+-- === ЖДЕМ ПОЛНОЙ ЗАГРУЗКИ ИГРОКА ===
+while not Players.LocalPlayer do task.wait() end
+local player = Players.LocalPlayer
+
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
-local player = Players.LocalPlayer
 
 -- === НАСТРОЙКИ СВЯЗИ ===
 local SERVER_IP = "http://191.44.113.226:5000"
@@ -13,14 +17,13 @@ local BOT_USERNAME = "HordaPosterbot"
 local hwid = "UNKNOWN"
 pcall(function() hwid = game:GetService("RbxAnalyticsService"):GetClientId() end)
 if hwid == "UNKNOWN" or hwid == "" or hwid == nil then
-    hwid = player and tostring(player.UserId) .. "_USER" or "GUEST_" .. tostring(math.random(1000, 9999))
+    hwid = tostring(player.UserId) .. "_USER"
 end
 
--- Получаем ID игрока для аватарки в боте
-local robloxId = player and tostring(player.UserId) or "0"
-
--- Ссылка теперь содержит и HWID, и Roblox ID (разделенные нижним подчеркиванием)
+local robloxId = tostring(player.UserId)
 local botLink = "https://t.me/" .. BOT_USERNAME .. "?start=" .. hwid .. "_" .. robloxId
+
+-- Дальше идет твой обычный код (Система сохранения ключей и т.д.)...
 
 -- === СИСТЕМА СОХРАНЕНИЯ КЛЮЧЕЙ ===
 local keyFileName = "HordaKey_" .. hwid .. ".txt"
@@ -29,6 +32,8 @@ local function loadKey()
     local success, content = pcall(function() return readfile(keyFileName) end)
     return success and content or ""
 end
+
+
 
 -- === БЕЗОПАСНОЕ СОЗДАНИЕ GUI ===
 local gui = Instance.new("ScreenGui")
