@@ -37,10 +37,19 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "HordaPremiumUI"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
+
+-- Удаляем старый GUI если перезапускаем скрипт
+for _, v in pairs(game:GetService("CoreGui"):GetChildren()) do
+    if v.Name == "HordaPremiumUI" then v:Destroy() end
+end
+for _, v in pairs(player:WaitForChild("PlayerGui"):GetChildren()) do
+    if v.Name == "HordaPremiumUI" then v:Destroy() end
+end
+
 local successCore = pcall(function() gui.Parent = game:GetService("CoreGui") end)
 if not successCore then gui.Parent = player:WaitForChild("PlayerGui") end
 
--- === ЦВЕТОВЫЕ АКЦЕНТЫ (Электрический синий -> Неоновый фиолетовый) ===
+-- === ЦВЕТОВЫЕ АКЦЕНТЫ ===
 local ACCENT_COLOR_1 = Color3.fromRGB(0, 230, 255)
 local ACCENT_COLOR_2 = Color3.fromRGB(180, 0, 255)
 local BG_COLOR = Color3.fromRGB(15, 15, 20)
@@ -66,13 +75,11 @@ local function applyDeepGlass(obj, radius, transparency, addNeonStroke)
     end
 end
 
--- === АНИМАЦИИ ПОЯВЛЕНИЯ (VFX) ===
-local function playFadeIn(obj)
-    obj.GroupTransparency = 1
-    obj.Size = UDim2.new(0, obj.Size.X.Offset * 0.9, 0, obj.Size.Y.Offset * 0.9)
-    TweenService:Create(obj, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-        GroupTransparency = 0,
-        Size = UDim2.new(0, obj.Size.X.Offset / 0.9, 0, obj.Size.Y.Offset / 0.9)
+-- === АНИМАЦИИ ПОЯВЛЕНИЯ ===
+local function playPopIn(obj, targetSize)
+    obj.Size = UDim2.new(0, targetSize.X.Offset * 0.8, 0, targetSize.Y.Offset * 0.8)
+    TweenService:Create(obj, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = targetSize
     }):Play()
 end
 
@@ -111,15 +118,12 @@ local function createToggleCard(parent, titleText, descText, iconId, callback)
     desc.TextXAlignment = Enum.TextXAlignment.Left
     desc.BackgroundTransparency = 1
 
-    -- Тумблер (Toggle)
     local toggleBtn = Instance.new("TextButton", card)
     toggleBtn.Size = UDim2.new(0, 44, 0, 24)
     toggleBtn.Position = UDim2.new(1, -60, 0.5, -12)
     toggleBtn.Text = ""
     toggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
-    local stroke = Instance.new("UIStroke", toggleBtn)
-    stroke.Color = Color3.fromRGB(80, 80, 90)
 
     local circle = Instance.new("Frame", toggleBtn)
     circle.Size = UDim2.new(0, 18, 0, 18)
@@ -134,9 +138,8 @@ local function createToggleCard(parent, titleText, descText, iconId, callback)
         local targetColor = enabled and ACCENT_COLOR_1 or Color3.fromRGB(200, 200, 200)
         local targetBg = enabled and ACCENT_COLOR_2 or Color3.fromRGB(40, 40, 50)
         
-        TweenService:Create(circle, TweenInfo.new(0.3, Enum.EasingStyle.Back), {Position = targetPos, BackgroundColor3 = targetColor}):Play()
+        TweenService:Create(circle, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {Position = targetPos, BackgroundColor3 = targetColor}):Play()
         TweenService:Create(toggleBtn, TweenInfo.new(0.3), {BackgroundColor3 = targetBg}):Play()
-        
         callback(enabled)
     end)
     return card
@@ -208,26 +211,56 @@ local function notifyLoginToTelegram()
     end)
 end
 
+-- === ИКОНКА СВОРАЧИВАНИЯ / ОТКРЫТИЯ (Тоггл Меню) ===
+local toggleMenuBtn = Instance.new("TextButton", gui)
+toggleMenuBtn.Size = UDim2.new(0, 45, 0, 45)
+toggleMenuBtn.Position = UDim2.new(0, 10, 0.5, -22)
+toggleMenuBtn.Text = "H"
+toggleMenuBtn.Font = Enum.Font.GothamBold
+toggleMenuBtn.TextSize = 20
+toggleMenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleMenuBtn.Visible = false -- Станет видимым после успешного логина
+applyDeepGlass(toggleMenuBtn, 25, 0.2, true)
+
 -- === ОСНОВНОЕ МЕНЮ ЧИТОВ ===
 local function StartMainCheat(validKey)
     saveKey(validKey)
     notifyLoginToTelegram()
     
-    if gui:FindFirstChild("LoginGroup") then gui.LoginGroup:Destroy() end
+    if gui:FindFirstChild("LoginFrame") then gui.LoginFrame:Destroy() end
 
-    -- Главный контейнер (CanvasGroup для прозрачности)
-    local mainUI = Instance.new("CanvasGroup", gui)
-    mainUI.Name = "MainHubGroup"
+    -- Главный контейнер (Frame вместо CanvasGroup)
+    local mainUI = Instance.new("Frame", gui)
+    mainUI.Name = "MainHubFrame"
     mainUI.Size = UDim2.new(0, 520, 0, 360)
     mainUI.Position = UDim2.new(0.5, -260, 0.5, -180)
     applyDeepGlass(mainUI, 12, 0.15, true)
     
+    -- Логика сворачивания меню
+    toggleMenuBtn.Visible = true
+    toggleMenuBtn.MouseButton1Click:Connect(function()
+        mainUI.Visible = not mainUI.Visible
+    end)
+
+    -- Кнопка закрыть внутри меню
+    local closeBtn = Instance.new("TextButton", mainUI)
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -40, 0, 10)
+    closeBtn.Text = "X"
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 16
+    closeBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+    closeBtn.BackgroundTransparency = 1
+    closeBtn.ZIndex = 10
+    closeBtn.MouseButton1Click:Connect(function() mainUI.Visible = false end)
+
     -- SIDEBAR (Боковая панель)
     local sidebar = Instance.new("Frame", mainUI)
     sidebar.Size = UDim2.new(0, 60, 1, 0)
     sidebar.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
     sidebar.BackgroundTransparency = 0.5
     sidebar.BorderSizePixel = 0
+    Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 12)
     
     local sidebarLine = Instance.new("Frame", sidebar)
     sidebarLine.Size = UDim2.new(0, 1, 1, 0)
@@ -275,7 +308,6 @@ local function StartMainCheat(validKey)
         layout.Padding = UDim.new(0, 10)
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
         
-        -- Отступ сверху
         local spacer = Instance.new("Frame", page)
         spacer.Size = UDim2.new(1, 0, 0, 10)
         spacer.BackgroundTransparency = 1
@@ -289,9 +321,8 @@ local function StartMainCheat(validKey)
     local pageProfile = createSidebarTab("🏠", "Profile", 20)
     local pageGeneral = createSidebarTab("⚙️", "General", 80)
     local pageMM2     = createSidebarTab("🔪", "MM2", 140)
-    local pageFuture  = createSidebarTab("🌐", "Future", 200)
 
-    -- === ВКЛАДКА ПРОФИЛЬ (Лицензия Агента) ===
+    -- === ВКЛАДКА ПРОФИЛЬ ===
     local idCard = Instance.new("Frame", pageProfile)
     idCard.Size = UDim2.new(1, -40, 0, 160)
     applyDeepGlass(idCard, 10, 0.3, false)
@@ -304,9 +335,6 @@ local function StartMainCheat(validKey)
     pcall(function()
         avatar.Image = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
     end)
-    local avaStroke = Instance.new("UIStroke", avatar)
-    avaStroke.Color = ACCENT_COLOR_1
-    avaStroke.Thickness = 2
 
     local idTitle = Instance.new("TextLabel", idCard)
     idTitle.Size = UDim2.new(0, 200, 0, 30)
@@ -321,7 +349,7 @@ local function StartMainCheat(validKey)
     local idName = Instance.new("TextLabel", idCard)
     idName.Size = UDim2.new(0, 200, 0, 20)
     idName.Position = UDim2.new(0, 140, 0, 60)
-    idName.Text = "ID: " .. player.Name
+    idName.Text = "Игрок: " .. player.Name
     idName.Font = Enum.Font.Gotham
     idName.TextSize = 14
     idName.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -331,31 +359,21 @@ local function StartMainCheat(validKey)
     local trustLabel = Instance.new("TextLabel", idCard)
     trustLabel.Size = UDim2.new(0, 200, 0, 20)
     trustLabel.Position = UDim2.new(0, 140, 0, 90)
-    trustLabel.Text = "Trust Factor: HIGH"
+    trustLabel.Text = "Статус подписки: АКТИВНО"
     trustLabel.Font = Enum.Font.GothamBold
     trustLabel.TextSize = 12
     trustLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
     trustLabel.TextXAlignment = Enum.TextXAlignment.Left
     trustLabel.BackgroundTransparency = 1
 
-    local progressBg = Instance.new("Frame", idCard)
-    progressBg.Size = UDim2.new(0, 200, 0, 6)
-    progressBg.Position = UDim2.new(0, 140, 0, 115)
-    progressBg.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    Instance.new("UICorner", progressBg).CornerRadius = UDim.new(1, 0)
-    local progressFill = Instance.new("Frame", progressBg)
-    progressFill.Size = UDim2.new(0.85, 0, 1, 0)
-    progressFill.BackgroundColor3 = ACCENT_COLOR_2
-    Instance.new("UICorner", progressFill).CornerRadius = UDim.new(1, 0)
-
-    -- === ФУНКЦИИ: GENERAL (ОБЩИЕ) ===
+    -- === ФУНКЦИИ: GENERAL ===
     createToggleCard(pageGeneral, "Speed Hack", "Мгновенное увеличение скорости бега", "6031215978", function(state)
         if player.Character and player.Character:FindFirstChild("Humanoid") then
             player.Character.Humanoid.WalkSpeed = state and 60 or 16
         end
     end)
 
-    createToggleCard(pageGeneral, "Super Jump", "Увеличенная гравитация прыжка", "6031222886", function(state)
+    createToggleCard(pageGeneral, "Super Jump", "Высокий прыжок (Гравитация)", "6031222886", function(state)
         if player.Character and player.Character:FindFirstChild("Humanoid") then
             player.Character.Humanoid.UseJumpPower = true
             player.Character.Humanoid.JumpPower = state and 100 or 50
@@ -366,9 +384,9 @@ local function StartMainCheat(validKey)
         game.Lighting.Ambient = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(128, 128, 128)
     end)
 
-    -- === ФУНКЦИИ: MM2 (🔪) ===
+    -- === ФУНКЦИИ: MM2 ===
     local espActive = false
-    createToggleCard(pageMM2, "ESP Ролей", "Взор сквозь стены и определение ролей", "3926305904", function(state)
+    createToggleCard(pageMM2, "ESP Ролей", "Видеть убийцу и шерифа сквозь стены", "3926305904", function(state)
         espActive = state
         if espActive then
             task.spawn(function()
@@ -429,25 +447,11 @@ local function StartMainCheat(validKey)
         end
     end)
 
-    createActionCard(pageMM2, "Телепорт в Лобби", "Вернуться на безопасную базу", "6031225815", function()
-        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            player.Character.HumanoidRootPart.CFrame = CFrame.new(-109.56, 138.87, 43.15)
-        end
-    end)
-
-    -- === ВКЛАДКА FUTURE (Глобал) ===
-    local soonTxt = Instance.new("TextLabel", pageFuture)
-    soonTxt.Size = UDim2.new(1, 0, 0, 50)
-    soonTxt.Text = "Новые режимы скоро..."
-    soonTxt.Font = Enum.Font.GothamBold
-    soonTxt.TextColor3 = Color3.fromRGB(150, 150, 150)
-    soonTxt.BackgroundTransparency = 1
-
     -- Запуск
     SwitchPage("Profile")
-    playFadeIn(mainUI)
+    playPopIn(mainUI, UDim2.new(0, 520, 0, 360))
 
-    -- Проверка ключа раз в 20 сек
+    -- Проверка ключа раз в 20 секунд
     task.spawn(function()
         while true do
             task.wait(20)
@@ -464,29 +468,15 @@ local function StartMainCheat(validKey)
     end)
 end
 
--- === АВТО-ЛОГИН ===
-local savedKey = loadKey()
-if savedKey ~= "" then
-    local url = SERVER_IP .. "/check_key?hwid=" .. hwid .. "&key=" .. savedKey
-    local success, response = pcall(function() return game:HttpGet(url) end)
-    if success and response then
-        local validJSON, data = pcall(function() return HttpService:JSONDecode(response) end)
-        if validJSON and data and data.valid then
-            StartMainCheat(savedKey)
-            return 
-        end
-    end
-end
+-- === ОКНО ВХОДА (Отрисовываем мгновенно) ===
+local loginFrame = Instance.new("Frame", gui)
+loginFrame.Name = "LoginFrame"
+loginFrame.Size = UDim2.new(0, 340, 0, 260)
+loginFrame.Position = UDim2.new(0.5, -170, 0.5, -130)
+applyDeepGlass(loginFrame, 12, 0.15, true)
+playPopIn(loginFrame, UDim2.new(0, 340, 0, 260))
 
--- === ОКНО ВХОДА (Если нет ключа) ===
-local loginGroup = Instance.new("CanvasGroup", gui)
-loginGroup.Name = "LoginGroup"
-loginGroup.Size = UDim2.new(0, 340, 0, 260)
-loginGroup.Position = UDim2.new(0.5, -170, 0.5, -130)
-applyDeepGlass(loginGroup, 12, 0.15, true)
-playFadeIn(loginGroup)
-
-local titleLabel = Instance.new("TextLabel", loginGroup)
+local titleLabel = Instance.new("TextLabel", loginFrame)
 titleLabel.Size = UDim2.new(1, 0, 0, 40)
 titleLabel.Text = "NEON KEY SYSTEM"
 titleLabel.TextColor3 = ACCENT_COLOR_1
@@ -494,7 +484,7 @@ titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 18
 titleLabel.BackgroundTransparency = 1
 
-local hwidLabel = Instance.new("TextLabel", loginGroup)
+local hwidLabel = Instance.new("TextLabel", loginFrame)
 hwidLabel.Size = UDim2.new(1, 0, 0, 20)
 hwidLabel.Position = UDim2.new(0, 0, 0, 40)
 hwidLabel.Text = "HWID: " .. string.sub(hwid, 1, 15) .. "..."
@@ -503,7 +493,7 @@ hwidLabel.Font = Enum.Font.Gotham
 hwidLabel.TextSize = 11
 hwidLabel.BackgroundTransparency = 1
 
-local btnCopy = Instance.new("TextButton", loginGroup)
+local btnCopy = Instance.new("TextButton", loginFrame)
 btnCopy.Size = UDim2.new(1, -40, 0, 40)
 btnCopy.Position = UDim2.new(0, 20, 0, 75)
 btnCopy.Text = "Получить ключ (Telegram)"
@@ -512,7 +502,7 @@ btnCopy.TextColor3 = Color3.fromRGB(255, 255, 255)
 btnCopy.TextSize = 13
 applyDeepGlass(btnCopy, 8, 0.4, false)
 
-local inputKey = Instance.new("TextBox", loginGroup)
+local inputKey = Instance.new("TextBox", loginFrame)
 inputKey.Size = UDim2.new(1, -40, 0, 40)
 inputKey.Position = UDim2.new(0, 20, 0, 125)
 inputKey.PlaceholderText = "Вставь ключ сюда..."
@@ -522,7 +512,7 @@ inputKey.Font = Enum.Font.Gotham
 inputKey.TextSize = 13
 applyDeepGlass(inputKey, 8, 0.5, false)
 
-local btnLogin = Instance.new("TextButton", loginGroup)
+local btnLogin = Instance.new("TextButton", loginFrame)
 btnLogin.Size = UDim2.new(1, -40, 0, 40)
 btnLogin.Position = UDim2.new(0, 20, 0, 175)
 btnLogin.Text = "АВТОРИЗАЦИЯ"
@@ -531,7 +521,7 @@ btnLogin.TextColor3 = BG_COLOR
 btnLogin.BackgroundColor3 = ACCENT_COLOR_1
 Instance.new("UICorner", btnLogin).CornerRadius = UDim.new(0, 8)
 
-local statusLabel = Instance.new("TextLabel", loginGroup)
+local statusLabel = Instance.new("TextLabel", loginFrame)
 statusLabel.Size = UDim2.new(1, 0, 0, 20)
 statusLabel.Position = UDim2.new(0, 0, 0, 225)
 statusLabel.Text = ""
@@ -544,7 +534,6 @@ btnCopy.MouseButton1Click:Connect(function()
     pcall(function() setclipboard(botLink) end)
     statusLabel.TextColor3 = ACCENT_COLOR_1
     statusLabel.Text = "Ссылка скопирована!"
-    pcall(function() GuiService:OpenBrowserWindow(botLink) end)
 end)
 
 btnLogin.MouseButton1Click:Connect(function()
@@ -571,5 +560,25 @@ btnLogin.MouseButton1Click:Connect(function()
         statusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
         statusLabel.Text = "СЕРВЕР НЕДОСТУПЕН"
         btnLogin.Text = "АВТОРИЗАЦИЯ"
+    end
+end)
+
+-- === АСИНХРОННЫЙ АВТО-ЛОГИН ===
+-- Вынесен вниз и запускается в отдельном потоке, чтобы не замораживать интерфейс
+task.spawn(function()
+    local savedKey = loadKey()
+    if savedKey ~= "" then
+        statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        statusLabel.Text = "Проверка сохраненного ключа..."
+        local url = SERVER_IP .. "/check_key?hwid=" .. hwid .. "&key=" .. savedKey
+        local success, response = pcall(function() return game:HttpGet(url) end)
+        if success and response then
+            local validJSON, data = pcall(function() return HttpService:JSONDecode(response) end)
+            if validJSON and data and data.valid then
+                StartMainCheat(savedKey)
+                return 
+            end
+        end
+        statusLabel.Text = "" -- Если авто-логин не удался, очищаем надпись
     end
 end)
